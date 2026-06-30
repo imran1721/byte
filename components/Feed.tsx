@@ -9,9 +9,10 @@ import Onboarding from "@/components/Onboarding";
 import ByteIcon from "@/components/ByteIcon";
 import ThemeToggle from "@/components/ThemeToggle";
 
-type Filter = "all" | "foryou" | CategoryId;
+type Filter = "all" | "foryou" | "saved" | CategoryId;
 
 const INTERESTS_KEY = "fresh:interests";
+const SAVED_KEY = "byte:saved";
 const PAGE = 6; // cards rendered initially, and added each time you near the end
 
 const SOURCE_LABEL: Record<Source, string> = {
@@ -75,6 +76,30 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
   const [interests, setInterests] = useState<CategoryId[] | null>(null);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
+  // Saved-for-later posts. Stored in full (not just ids) so the Saved view works
+  // even after the item drops out of the live feed.
+  const [saved, setSaved] = useState<FeedItem[]>([]);
+  const savedIds = useMemo(() => new Set(saved.map((i) => i.id)), [saved]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SAVED_KEY);
+      if (raw) setSaved(JSON.parse(raw) as FeedItem[]);
+    } catch {
+      /* ignore corrupt storage */
+    }
+  }, []);
+
+  const toggleSave = (item: FeedItem) => {
+    setSaved((prev) => {
+      const next = prev.some((i) => i.id === item.id)
+        ? prev.filter((i) => i.id !== item.id)
+        : [item, ...prev];
+      localStorage.setItem(SAVED_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
   // Tell the splash the content is on screen so it can dismiss (set a flag too,
   // in case the splash mounts after this fires).
   useEffect(() => {
@@ -131,13 +156,14 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
     !!interests && i.categories.some((c) => interests.includes(c));
 
   const visible = useMemo(() => {
+    if (filter === "saved") return saved; // its own pool, no source/topic filtering
     let v = items;
     if (filter === "foryou") v = v.filter(inInterests);
     else if (filter !== "all") v = v.filter((i) => i.categories.includes(filter));
     if (sources.size > 0) v = v.filter((i) => sources.has(i.source));
     return v;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, filter, sources, interests]);
+  }, [items, filter, sources, interests, saved]);
 
   // Sources present in the feed, in display order.
   const sourcePills = useMemo(() => {
@@ -165,6 +191,7 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
         ]
       : []),
     { id: "all", label: "All", count: items.length },
+    { id: "saved", label: "Saved", emoji: "🔖", count: saved.length },
     ...CATEGORY_ORDER.filter((id) => (counts[id] ?? 0) > 0).map((id) => ({
       id,
       label: CATEGORY_META[id].label,
@@ -356,23 +383,34 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
             setCount((c) => Math.min(c + PAGE, visible.length));
           }
           // Within 10 of the end of loaded data → fetch the next page (unless
-          // this single-source view can't grow any further).
-          if (i >= visible.length - 10 && !sourceExhausted) loadMore();
+          // this view has a fixed pool: single non-paginating source, or Saved).
+          if (i >= visible.length - 10 && !sourceExhausted && filter !== "saved")
+            loadMore();
         }}
         className="no-scrollbar h-[100dvh] snap-y snap-mandatory overflow-y-scroll"
       >
         {visible.length === 0 ? (
           <div className="flex h-[100dvh] items-center justify-center px-6 text-center text-fg/60">
-            <p>Nothing here right now.</p>
+            <p>
+              {filter === "saved"
+                ? "No saved posts yet — tap the 🔖 on a card to save it."
+                : "Nothing here right now."}
+            </p>
           </div>
         ) : (
           <>
             {visible.slice(0, count).map((item, i) => (
-              <Card key={item.id} item={item} index={i} />
+              <Card
+                key={item.id}
+                item={item}
+                index={i}
+                saved={savedIds.has(item.id)}
+                onToggleSave={() => toggleSave(item)}
+              />
             ))}
             {count >= visible.length && (
               <section className="flex h-[100dvh] snap-start items-center justify-center text-center text-fg/40">
-                {done || sourceExhausted ? (
+                {done || sourceExhausted || filter === "saved" ? (
                   <div>
                     <p className="text-xl font-semibold text-fg">
                       You&apos;re all caught up

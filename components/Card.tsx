@@ -12,7 +12,17 @@ const SOURCE_META = {
   producthunt: { label: "Product Hunt", accent: "#ff6154", pointLabel: "upvotes" },
 } as const;
 
-export default function Card({ item, index }: { item: FeedItem; index: number }) {
+export default function Card({
+  item,
+  index,
+  saved,
+  onToggleSave,
+}: {
+  item: FeedItem;
+  index: number;
+  saved?: boolean;
+  onToggleSave?: () => void;
+}) {
   const meta = SOURCE_META[item.source];
 
   return (
@@ -30,6 +40,31 @@ export default function Card({ item, index }: { item: FeedItem; index: number })
         aria-label={`Open: ${item.title}`}
         className="absolute inset-0 z-0"
       />
+
+      {/* Save for later — sits above the link so it's independently clickable. */}
+      {onToggleSave && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleSave();
+          }}
+          aria-label={saved ? "Remove from saved" : "Save for later"}
+          aria-pressed={saved}
+          className="absolute right-4 top-16 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-fg/10 text-fg backdrop-blur transition hover:bg-fg/20 sm:top-20"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="h-5 w-5"
+            fill={saved ? "currentColor" : "none"}
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          >
+            <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" />
+          </svg>
+        </button>
+      )}
 
       <div className="card-body pointer-events-none relative z-10 w-full max-w-xl">
         {/* Hero image (hidden if it fails to load) */}

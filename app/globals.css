@@ -51,17 +51,21 @@ body {
   .card-section { padding-top: 3.5rem; }
 }
 
-/* Pull-chain tug: yank down, overshoot, settle — like a real light pull. */
-@keyframes chain-tug {
-  0% { transform: translateY(0); }
-  28% { transform: translateY(10px); }
-  52% { transform: translateY(-3px); }
-  72% { transform: translateY(4px); }
-  88% { transform: translateY(-1px); }
-  100% { transform: translateY(0); }
+/* Pull-chain release: the cord springs back from the pulled length and bobs
+   up/down a few times with decreasing amplitude before settling — the jittery,
+   slightly-jumpy motion of a real light pull. Driven by --pulled/--cord which
+   ThemeToggle sets per release. */
+@keyframes cord-release {
+  0%   { height: var(--pulled); }
+  30%  { height: calc(var(--cord) - 7px); }   /* overshoot up */
+  50%  { height: calc(var(--cord) + 5px); }   /* bob down */
+  66%  { height: calc(var(--cord) - 3px); }
+  80%  { height: calc(var(--cord) + 1.5px); }
+  91%  { height: calc(var(--cord) - 0.7px); }
+  100% { height: var(--cord); }
 }
-.chain-pull {
-  animation: chain-tug 0.55s cubic-bezier(0.34, 1.4, 0.5, 1);
+.cord-release {
+  animation: cord-release 0.7s cubic-bezier(0.3, 0.1, 0.25, 1);
 }
 
 /* Hide scrollbar but keep scrolling for the snap feed. */

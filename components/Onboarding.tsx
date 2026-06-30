@@ -10,10 +10,16 @@ const CHOICES = CATEGORY_ORDER.filter((id) => id !== "other");
 
 export default function Onboarding({
   onDone,
+  initial = [],
+  onCancel,
 }: {
   onDone: (selected: CategoryId[]) => void;
+  /** Pre-selected interests (when editing an existing selection). */
+  initial?: CategoryId[];
+  /** When provided (edit mode), shows a way to back out without saving. */
+  onCancel?: () => void;
 }) {
-  const [selected, setSelected] = useState<CategoryId[]>([]);
+  const [selected, setSelected] = useState<CategoryId[]>(initial);
 
   const toggle = (id: CategoryId) =>
     setSelected((s) =>
@@ -23,6 +29,15 @@ export default function Onboarding({
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-y-auto bg-bg px-6 py-12">
       <div className="w-full max-w-lg">
+        {onCancel && (
+          <button
+            onClick={onCancel}
+            aria-label="Close"
+            className="absolute right-5 top-5 text-2xl leading-none text-fg/40 transition hover:text-fg"
+          >
+            ✕
+          </button>
+        )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/byte-logo.png" alt="byte" className="h-10 w-auto" />
         <p className="mt-2 text-sm font-semibold uppercase tracking-[0.2em] text-fg/40">

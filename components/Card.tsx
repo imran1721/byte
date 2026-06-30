@@ -22,7 +22,16 @@ export default function Card({ item, index }: { item: FeedItem; index: number })
         background: `radial-gradient(120% 80% at 50% 0%, ${meta.accent}22 0%, rgb(var(--bg)) 55%)`,
       }}
     >
-      <div className="card-body w-full max-w-xl">
+      {/* The whole card is the link — a full-bleed anchor under the content. */}
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`Open: ${item.title}`}
+        className="absolute inset-0 z-0"
+      />
+
+      <div className="card-body pointer-events-none relative z-10 w-full max-w-xl">
         {/* Hero image (hidden if it fails to load) */}
         {item.image && (
           <CardImage src={item.image} alt={item.title} accent={meta.accent} />
@@ -86,36 +95,16 @@ export default function Card({ item, index }: { item: FeedItem; index: number })
           {item.author && <span>by {item.author}</span>}
         </div>
 
-        {/* Actions — the destination URL shown with its favicon */}
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <a
-            href={item.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 rounded-xl bg-fg/10 px-4 py-3 font-medium text-fg transition hover:bg-fg/20"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`https://www.google.com/s2/favicons?domain=${hostOf(item.url)}&sz=64`}
-              alt=""
-              className="h-4 w-4 rounded-sm"
-            />
-            <span>{hostOf(item.url)}</span>
-            <span aria-hidden className="text-fg/40">
-              ↗
-            </span>
-          </a>
-          {item.discussionUrl && item.discussionUrl !== item.url && (
-            <a
-              href={item.discussionUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-xl px-4 py-3 font-medium text-bg transition hover:opacity-90"
-              style={{ background: meta.accent }}
-            >
-              Discussion
-            </a>
-          )}
+        {/* Where tapping the card goes */}
+        <div className="mt-6 flex items-center gap-2 text-sm text-fg/50">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`https://www.google.com/s2/favicons?domain=${hostOf(item.url)}&sz=64`}
+            alt=""
+            className="h-4 w-4 rounded-sm"
+          />
+          <span>{hostOf(item.url)}</span>
+          <span aria-hidden>↗</span>
         </div>
       </div>
 

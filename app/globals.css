@@ -21,6 +21,19 @@ body {
   overscroll-behavior: none;
 }
 
+/* Smooth color crossfade while the theme flips. Scoped to a class that
+   ThemeToggle adds only during the switch, so it never affects hovers. */
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition:
+    background-color 0.35s ease,
+    color 0.35s ease,
+    border-color 0.35s ease,
+    fill 0.35s ease !important;
+}
+
 /* On short viewports (small phones, landscape) scale the whole card down so
    the image, text, and buttons all fit instead of overflowing. `zoom` scales
    fonts + image + spacing together; the fixed header/counter stay full size.
@@ -36,6 +49,19 @@ body {
 @media (max-height: 580px) {
   .card-body { zoom: 0.72; }
   .card-section { padding-top: 3.5rem; }
+}
+
+/* Pull-chain tug: yank down, overshoot, settle — like a real light pull. */
+@keyframes chain-tug {
+  0% { transform: translateY(0); }
+  28% { transform: translateY(10px); }
+  52% { transform: translateY(-3px); }
+  72% { transform: translateY(4px); }
+  88% { transform: translateY(-1px); }
+  100% { transform: translateY(0); }
+}
+.chain-pull {
+  animation: chain-tug 0.55s cubic-bezier(0.34, 1.4, 0.5, 1);
 }
 
 /* Hide scrollbar but keep scrolling for the snap feed. */

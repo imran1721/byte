@@ -20,7 +20,6 @@ const SOURCE_LABEL: Record<Source, string> = {
   github: "GitHub",
   devto: "Dev.to",
   lobsters: "Lobsters",
-  reddit: "Reddit",
   producthunt: "Product Hunt",
 };
 // Sources that paginate deeply; the rest only seed page 0, so filtering to them
@@ -268,7 +267,6 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
       "github",
       "devto",
       "lobsters",
-      "reddit",
       "producthunt",
     ];
     return order.filter((s) => present.has(s));

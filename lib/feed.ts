@@ -3,7 +3,6 @@ import { fetchHackerNews } from "@/lib/sources/hackernews";
 import { fetchGitHub } from "@/lib/sources/github";
 import { fetchLobsters } from "@/lib/sources/lobsters";
 import { fetchDevto } from "@/lib/sources/devto";
-import { fetchReddit } from "@/lib/sources/reddit";
 import { fetchProductHunt } from "@/lib/sources/producthunt";
 import { enrichDescriptions } from "@/lib/enrich";
 import { categorize } from "@/lib/categorize";
@@ -23,7 +22,7 @@ function rank(item: FeedItem): number {
 /**
  * One page of the feed. Paginating sources (HN, GitHub, Dev.to) fetch their
  * `page`; HN alone has ~250 pages, so the feed effectively never runs out.
- * Non-paginating sources (Lobsters, Reddit, Product Hunt) only contribute on
+ * Non-paginating sources (Lobsters, Product Hunt) only contribute on
  * page 0 for variety up top. Each page is ranked within itself and the client
  * appends pages, so already-shown items never reorder.
  */
@@ -41,7 +40,7 @@ export async function getFeedPage(
     fetchGitHub(page, q),
     ...(q ? [] : [fetchDevto(page)]),
     ...(first && !q
-      ? [fetchLobsters(), fetchReddit(), fetchProductHunt()]
+      ? [fetchLobsters(), fetchProductHunt()]
       : []),
   ]);
 

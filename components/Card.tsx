@@ -8,7 +8,6 @@ const SOURCE_META = {
   github: { label: "GitHub", accent: "#8b5cf6", pointLabel: "stars" },
   lobsters: { label: "Lobsters", accent: "#b91c1c", pointLabel: "points" },
   devto: { label: "DEV", accent: "#0ea5e9", pointLabel: "reactions" },
-  reddit: { label: "Reddit", accent: "#ff4500", pointLabel: "upvotes" },
   producthunt: { label: "Product Hunt", accent: "#ff6154", pointLabel: "upvotes" },
 } as const;
 

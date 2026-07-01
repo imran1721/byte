@@ -5,7 +5,6 @@ export type Source =
   | "github"
   | "lobsters"
   | "devto"
-  | "reddit"
   | "producthunt";
 
 /** Feed ordering: popular-and-fresh ("trending") vs newest-first ("latest"). */

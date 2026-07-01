@@ -16,10 +16,9 @@ One full-screen card per item, snap scrolling, infinite feed.
   | **GitHub** | new repos by stars (Search API) | optional token |
   | **Dev.to** | top articles of the week | none |
   | **Lobsters** | hottest dev stories | none |
-  | **Reddit** | r/programming, webdev, selfhosted, LocalLLaMA | OAuth creds |
   | **Product Hunt** | newly upvoted products | dev token |
 
-  Reddit and Product Hunt are skipped silently unless their keys are set.
+  Product Hunt is skipped silently unless its key is set.
 
 - **Ranks** everything with a trending score (popularity damped by `log`,
   decayed by age — the classic HN gravity shape) and **dedupes** across sources.
@@ -60,8 +59,6 @@ Everything works with no keys. Copy `.env.example` → `.env.local` to unlock mo
 
 - `GITHUB_TOKEN` — raises the GitHub Search rate limit (10 → 30 req/min).
 - `PRODUCT_HUNT_TOKEN` — enables the Product Hunt source ([dev token](https://www.producthunt.com/v2/oauth/applications)).
-- `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` — enables Reddit (anonymous `.json`
-  access is now blocked; register a free "script" app at reddit.com/prefs/apps).
 
 ## How it's built
 

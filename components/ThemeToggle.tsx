@@ -10,36 +10,17 @@ const MAX_DIST = 300; // how far the bead can be pulled
 const BEAD = 24; // bead diameter
 const HAPTIC_STEP = 16; // px of stretch between bead "ticks"
 
-// iOS Safari ignores navigator.vibrate entirely. Its ONLY web-exposed haptic
-// is the native switch control: toggling an <input type="checkbox" switch>
-// inside a user gesture fires a light tap (iOS 17.4+). We keep one hidden
-// off-screen switch and "click" it. No-ops on browsers that don't render it.
-let iosSwitch: HTMLInputElement | null = null;
-function iosHaptic() {
-  if (typeof document === "undefined") return;
-  if (!iosSwitch) {
-    const label = document.createElement("label");
-    label.setAttribute("aria-hidden", "true");
-    label.style.cssText =
-      "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden";
-    iosSwitch = document.createElement("input");
-    iosSwitch.type = "checkbox";
-    iosSwitch.setAttribute("switch", ""); // native iOS switch → haptic on toggle
-    label.appendChild(iosSwitch);
-    document.body.appendChild(label);
-  }
-  iosSwitch.click(); // the native toggle is what triggers the tap
-}
-
-// Best-effort haptic: Vibration API where supported (Android/desktop), plus the
-// iOS switch trick. Both are no-ops where unsupported, so calling both is safe.
+// Web Vibration API — buzzes on Android Chrome / capable desktops. iOS Safari
+// has NO web haptic: it never implemented navigator.vibrate, and the old
+// <input switch> toggle trick was patched out in iOS 26.5. Only a real user tap
+// on a native switch fires the Taptic Engine there, which a pull-chain can't
+// use — so iOS simply gets no buzz.
 function buzz(ms: number) {
   try {
     navigator.vibrate?.(ms);
   } catch {
     /* unsupported */
   }
-  iosHaptic();
 }
 
 // Spring constants (per-frame) — lightly underdamped: a couple of bounces then

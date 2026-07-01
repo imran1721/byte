@@ -363,7 +363,9 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search…"
-              className="w-full min-w-0 bg-transparent text-sm text-fg outline-none placeholder:text-fg/40"
+              // text-base (16px): iOS Safari zooms the page in when a focused
+              // input's font is < 16px, which reads as the window resizing.
+              className="w-full min-w-0 bg-transparent text-base text-fg outline-none placeholder:text-fg/40"
             />
             <button
               type="button"

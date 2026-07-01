@@ -2,32 +2,39 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
-// A pull-chain light switch. Tap it, or grab the bead and pull the chain down
-// and release past the threshold — both flip the `.light` class on <html>.
-const CORD = 20; // resting cord length (px)
-const MAX_PULL = 40; // how far the cord can stretch
-const PULL_THRESHOLD = 18; // release past this → it switches
-const TAP_PULL = 15; // virtual pull distance for taps/keyboard, so they bob too
+// A pull-chain light switch. Grab the bead and pull it any direction, any
+// distance — on release it springs back with a bouncy wobble and flips the
+// `.light` class on <html>. Tapping works too.
+const REST = 32; // resting distance from anchor to bead centre (px)
+const MAX_DIST = 300; // how far the bead can be pulled
+const BEAD = 24; // bead diameter
+
+// Spring constants (per-frame) — lightly underdamped: a couple of bounces then
+// settles (damping ratio ~0.3).
+const STIFFNESS = 0.14;
+const DAMPING = 0.24;
 
 export default function ThemeToggle() {
   const [light, setLight] = useState(false);
-  const [dragY, setDragY] = useState(0);
   const [dragging, setDragging] = useState(false);
-  // Height the cord springs back from; non-null → the bounce animation is playing.
-  const [releaseFrom, setReleaseFrom] = useState<number | null>(null);
+  const [offset, setOffset] = useState({ x: 0, y: REST }); // bead centre vs anchor
 
   const draggingRef = useRef(false);
-  const dragYRef = useRef(0);
-  const startY = useRef(0);
   const moved = useRef(false);
-  const releaseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const anchor = useRef({ x: 0, y: 0 });
+  const pos = useRef({ x: 0, y: REST });
+  const vel = useRef({ x: 0, y: 0 });
+  const raf = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     setLight(document.documentElement.classList.contains("light"));
+    return () => {
+      if (raf.current) cancelAnimationFrame(raf.current);
+    };
   }, []);
 
   const flip = () => {
-    const next = !light;
+    const next = !document.documentElement.classList.contains("light");
     const root = document.documentElement;
     root.classList.add("theme-transition"); // smooth color crossfade
     setLight(next);
@@ -36,12 +43,30 @@ export default function ThemeToggle() {
     window.setTimeout(() => root.classList.remove("theme-transition"), 350);
   };
 
-  // Play the springy multi-bounce from the given pulled height.
-  const bounce = (fromHeight: number) => {
-    setReleaseFrom(null); // reset first so the animation restarts on rapid toggles
-    requestAnimationFrame(() => setReleaseFrom(fromHeight));
-    clearTimeout(releaseTimer.current);
-    releaseTimer.current = setTimeout(() => setReleaseFrom(null), 720);
+  // Spring the bead back to rest, carrying any release velocity → natural wobble.
+  const startSpring = () => {
+    if (raf.current) cancelAnimationFrame(raf.current);
+    const step = () => {
+      const p = pos.current;
+      const v = vel.current;
+      v.x += (0 - p.x) * STIFFNESS - v.x * DAMPING;
+      v.y += (REST - p.y) * STIFFNESS - v.y * DAMPING;
+      p.x += v.x;
+      p.y += v.y;
+      setOffset({ x: p.x, y: p.y });
+      const settled =
+        Math.abs(p.x) < 0.3 &&
+        Math.abs(p.y - REST) < 0.3 &&
+        Math.hypot(v.x, v.y) < 0.3;
+      if (settled) {
+        pos.current = { x: 0, y: REST };
+        vel.current = { x: 0, y: 0 };
+        setOffset({ x: 0, y: REST });
+        return;
+      }
+      raf.current = requestAnimationFrame(step);
+    };
+    raf.current = requestAnimationFrame(step);
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -50,7 +75,9 @@ export default function ThemeToggle() {
     } catch {
       /* not all pointers are capturable; fine */
     }
-    startY.current = e.clientY;
+    if (raf.current) cancelAnimationFrame(raf.current);
+    const r = e.currentTarget.getBoundingClientRect();
+    anchor.current = { x: r.left + r.width / 2, y: r.top };
     moved.current = false;
     draggingRef.current = true;
     setDragging(true);
@@ -58,42 +85,72 @@ export default function ThemeToggle() {
 
   const onPointerMove = (e: React.PointerEvent) => {
     if (!draggingRef.current) return;
-    const dy = e.clientY - startY.current;
-    if (dy > 3) moved.current = true;
-    const pulled = Math.max(0, Math.min(dy, MAX_PULL));
-    dragYRef.current = pulled;
-    setDragY(pulled);
+    let dx = e.clientX - anchor.current.x;
+    let dy = e.clientY - anchor.current.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > MAX_DIST) {
+      dx = (dx / dist) * MAX_DIST;
+      dy = (dy / dist) * MAX_DIST;
+    }
+    if (Math.hypot(dx, dy - REST) > 4) moved.current = true;
+    // Release velocity for a natural throw, clamped so a fast fling can't
+    // send the spring wild.
+    let vx = dx - pos.current.x;
+    let vy = dy - pos.current.y;
+    const vmag = Math.hypot(vx, vy);
+    const VMAX = 28;
+    if (vmag > VMAX) {
+      vx = (vx / vmag) * VMAX;
+      vy = (vy / vmag) * VMAX;
+    }
+    vel.current = { x: vx, y: vy };
+    pos.current = { x: dx, y: dy };
+    setOffset({ x: dx, y: dy });
   };
 
   const endDrag = () => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
     setDragging(false);
-    const pulled = dragYRef.current;
-    const wasTap = !moved.current;
-    if (pulled >= PULL_THRESHOLD || wasTap) flip();
-    // Bounce back from wherever it was let go (taps get a small virtual pull).
-    bounce(CORD + Math.max(pulled, wasTap ? TAP_PULL : 8));
-    dragYRef.current = 0;
-    setDragY(0);
+    flip(); // pulling the chain always toggles the light
+    if (!moved.current) {
+      // a tap gets a little downward kick so it still bounces
+      pos.current = { x: 0, y: REST + 20 };
+      vel.current = { x: 0, y: 0 };
+    }
+    startSpring();
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       flip();
-      bounce(CORD + TAP_PULL);
+      pos.current = { x: 0, y: REST + 20 };
+      vel.current = { x: 0, y: 0 };
+      startSpring();
     }
   };
 
-  const releasing = releaseFrom != null;
+  const dist = Math.hypot(offset.x, offset.y);
+  const angle = (Math.atan2(-offset.x, offset.y) * 180) / Math.PI;
+
   const cordStyle: CSSProperties = {
-    height: `${CORD + dragY}px`,
+    position: "absolute",
+    top: 0,
+    left: "calc(50% - 1.5px)",
+    width: "3px",
+    // Stop at the bead's edge (not its centre) so the beads don't show inside it.
+    height: `${Math.max(0, dist - BEAD / 2)}px`,
+    transformOrigin: "top center",
+    transform: `rotate(${angle}deg)`,
     background:
       "repeating-linear-gradient(to bottom, currentColor 0 2px, transparent 2px 4.5px)",
-    ...(releasing
-      ? ({ "--pulled": `${releaseFrom}px`, "--cord": `${CORD}px` } as CSSProperties)
-      : {}),
+  };
+  const beadStyle: CSSProperties = {
+    position: "absolute",
+    top: 0,
+    left: "50%",
+    transform: `translate(-50%, -50%) translate(${offset.x}px, ${offset.y}px)`,
   };
 
   return (
@@ -104,20 +161,21 @@ export default function ThemeToggle() {
       onPointerCancel={endDrag}
       onKeyDown={onKeyDown}
       aria-label={light ? "Turn off the lights" : "Turn on the lights"}
-      title="Tap or pull to switch theme"
-      className="relative -mt-4 h-11 w-6 touch-none cursor-grab select-none active:cursor-grabbing"
+      title="Pull the chain to switch theme"
+      className={`relative -mt-4 h-11 w-6 touch-none select-none ${
+        dragging ? "cursor-grabbing" : "cursor-grab"
+      }`}
     >
-      {/* Absolutely positioned so the cord stretching never resizes the header
-          row — it just overflows downward. */}
-      <span className="absolute inset-x-0 top-0 flex flex-col items-center">
-        {/* ball-chain cord — stretches as you pull, bobs on release */}
+      {/* Overflow so the swinging chain isn't clipped by the header row. */}
+      <span className="pointer-events-none absolute inset-0 text-fg/40">
+        <span style={cordStyle} />
         <span
-          className={`w-[3px] text-fg/40 ${releasing ? "cord-release" : ""}`}
-          style={cordStyle}
-        />
-        {/* the pull handle */}
-        <span className="flex h-6 w-6 items-center justify-center rounded-full border border-fg/20 bg-fg/10 text-[11px] leading-none shadow-sm">
-          {light ? "🌙" : "☀️"}
+          style={beadStyle}
+          className="flex items-center justify-center rounded-full border border-fg/20 bg-bg text-[11px] leading-none text-fg shadow-sm"
+        >
+          <span style={{ width: BEAD, height: BEAD }} className="flex items-center justify-center">
+            {light ? "🌙" : "☀️"}
+          </span>
         </span>
       </span>
     </button>

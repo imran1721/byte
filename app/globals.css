@@ -51,23 +51,6 @@ body {
   .card-section { padding-top: 3.5rem; }
 }
 
-/* Pull-chain release: the cord springs back from the pulled length and bobs
-   up/down a few times with decreasing amplitude before settling — the jittery,
-   slightly-jumpy motion of a real light pull. Driven by --pulled/--cord which
-   ThemeToggle sets per release. */
-@keyframes cord-release {
-  0%   { height: var(--pulled); }
-  30%  { height: calc(var(--cord) - 7px); }   /* overshoot up */
-  50%  { height: calc(var(--cord) + 5px); }   /* bob down */
-  66%  { height: calc(var(--cord) - 3px); }
-  80%  { height: calc(var(--cord) + 1.5px); }
-  91%  { height: calc(var(--cord) - 0.7px); }
-  100% { height: var(--cord); }
-}
-.cord-release {
-  animation: cord-release 0.7s cubic-bezier(0.3, 0.1, 0.25, 1);
-}
-
 /* Hide scrollbar but keep scrolling for the snap feed. */
 .no-scrollbar {
   -ms-overflow-style: none;

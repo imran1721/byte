@@ -3,6 +3,7 @@ import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import Splash from "@/components/Splash";
 import ServiceWorker from "@/components/ServiceWorker";
+import ClarityAnalytics from "@/components/ClarityAnalytics";
 
 // Geometric, techie display sans — modern and a bit playful.
 const font = Space_Grotesk({ subsets: ["latin"], display: "swap" });
@@ -34,6 +35,7 @@ export default function RootLayout({
         />
       </head>
       <body className={`${font.className} antialiased`}>
+        <ClarityAnalytics />
         <ServiceWorker />
         <Splash />
         {children}

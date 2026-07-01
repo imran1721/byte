@@ -27,9 +27,28 @@ const SOURCE_LABEL: Record<Source, string> = {
 // alone has a fixed pool (no point fetching more once you reach the end).
 const PAGINATING = new Set<Source>(["hackernews", "github", "devto"]);
 
+function SearchIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    >
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
 export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [mode, setMode] = useState<FeedMode>("trending"); // trending vs latest
+  const [query, setQuery] = useState(""); // committed search query ("" = off)
+  const [searchInput, setSearchInput] = useState(""); // the search text field
+  const [searchOpen, setSearchOpen] = useState(false); // nav search bar expanded
   const [sources, setSources] = useState<Set<Source>>(new Set()); // empty = all
   const [idx, setIdx] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -53,7 +72,8 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
     loadingRef.current = true;
     setLoadingMore(true);
     try {
-      const res = await fetch(`/api/feed?page=${pageRef.current}&mode=${mode}`);
+      const q = query ? `&q=${encodeURIComponent(query)}` : "";
+      const res = await fetch(`/api/feed?page=${pageRef.current}&mode=${mode}${q}`);
       const data = (await res.json()) as { items?: FeedItem[] };
       const incoming = data.items ?? [];
       pageRef.current += 1;
@@ -85,7 +105,8 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
     setRefreshing(true);
     try {
       // cache-bust so the route re-runs and surfaces anything new
-      const res = await fetch(`/api/feed?page=0&mode=${mode}&t=${Date.now()}`);
+      const q = query ? `&q=${encodeURIComponent(query)}` : "";
+      const res = await fetch(`/api/feed?page=0&mode=${mode}${q}&t=${Date.now()}`);
       const data = (await res.json()) as { items?: FeedItem[] };
       const fresh = (data.items ?? []).filter((it) => !seenRef.current.has(it.id));
       fresh.forEach((it) => seenRef.current.add(it.id));
@@ -99,15 +120,18 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
     }
   };
 
-  // Switch trending ⇄ latest: replace the feed with a fresh page 0 in the new
-  // mode and restart pagination. Reuses the refresh spinner while it loads.
-  const switchMode = async (m: FeedMode) => {
+  // Replace the whole feed with a fresh page 0 for a new mode/search and
+  // restart pagination. Backs the Trending/Latest toggle and search. Reuses the
+  // refresh spinner while it loads.
+  const reload = async (nextMode: FeedMode, nextQuery: string) => {
     setSheetOpen(false);
-    if (m === mode || refreshing) return;
-    setMode(m);
+    if (refreshing) return;
+    setMode(nextMode);
+    setQuery(nextQuery);
     setRefreshing(true);
     try {
-      const res = await fetch(`/api/feed?page=0&mode=${m}&t=${Date.now()}`);
+      const q = nextQuery ? `&q=${encodeURIComponent(nextQuery)}` : "";
+      const res = await fetch(`/api/feed?page=0&mode=${nextMode}${q}&t=${Date.now()}`);
       const data = (await res.json()) as { items?: FeedItem[] };
       const incoming = data.items ?? [];
       seenRef.current = new Set(incoming.map((i) => i.id));
@@ -122,6 +146,24 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
     } finally {
       setRefreshing(false);
     }
+  };
+
+  const switchMode = (m: FeedMode) => {
+    if (m !== mode) reload(m, query);
+    else setSheetOpen(false);
+  };
+  const runSearch = (raw: string) => {
+    const q = raw.trim();
+    if (!q) return;
+    // Don't let an active topic/source filter hide the search results.
+    setFilter("all");
+    setSources(new Set());
+    setSearchOpen(false); // collapse the bar to the active-search chip
+    reload(mode, q);
+  };
+  const clearSearch = () => {
+    setSearchInput("");
+    if (query) reload(mode, "");
   };
 
   // null = not loaded yet, [] never stored (we only save 3+). First-time users
@@ -299,33 +341,95 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
         />
       )}
 
-      {/* Header: logo + a single filter trigger that opens the picker sheet */}
-      <header className="fixed inset-x-0 top-0 z-20 flex items-center justify-between bg-gradient-to-b from-bg/90 to-transparent px-6 pb-5 pt-4">
-        <ByteIcon className="h-8 w-8" />
-        <div className="flex items-center gap-3">
-          <ThemeToggle />
-          <button
-            onClick={() => setSheetOpen(true)}
-            className="flex items-center gap-1.5 rounded-full bg-fg/10 px-3.5 py-1.5 text-sm font-medium text-fg/90 transition hover:bg-fg/20"
+      {/* Header: logo, an expandable search bar, theme toggle, filter trigger */}
+      <header className="fixed inset-x-0 top-0 z-20 flex items-center gap-2 bg-gradient-to-b from-bg/90 to-transparent px-6 pb-5 pt-4">
+        {searchOpen ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              runSearch(searchInput);
+              (document.activeElement as HTMLElement | null)?.blur();
+            }}
+            className="flex w-full items-center gap-2 rounded-full bg-fg/10 px-4 py-2"
           >
-            {activePill.emoji && <span>{activePill.emoji}</span>}
-            <span>
-              {activePill.label}
-              {mode === "latest" && (
-                <span className="text-fg/50">{" · "}Latest</span>
+            <SearchIcon className="h-4 w-4 shrink-0 text-fg/40" />
+            {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
+            <input
+              autoFocus
+              type="search"
+              enterKeyHint="search"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search Hacker News & GitHub…"
+              className="w-full bg-transparent text-sm text-fg outline-none placeholder:text-fg/40"
+            />
+            <button
+              type="button"
+              aria-label="Close search"
+              onClick={() => {
+                setSearchOpen(false);
+                clearSearch();
+              }}
+              className="shrink-0 text-fg/50 transition hover:text-fg"
+            >
+              ✕
+            </button>
+          </form>
+        ) : (
+          <>
+            <ByteIcon className="h-8 w-8" />
+            <div className="ml-auto flex items-center gap-2">
+              {query ? (
+                <button
+                  onClick={() => {
+                    setSearchInput(query);
+                    setSearchOpen(true);
+                  }}
+                  aria-label="Edit search"
+                  className="flex items-center gap-1.5 rounded-full bg-fg/10 px-3 py-1.5 text-sm font-medium text-fg/90 transition hover:bg-fg/20"
+                >
+                  <SearchIcon className="h-4 w-4 text-fg/60" />
+                  <span className="inline-block max-w-[7rem] truncate align-bottom">
+                    {query}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setSearchInput("");
+                    setSearchOpen(true);
+                  }}
+                  aria-label="Search"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-fg/10 text-fg/90 transition hover:bg-fg/20"
+                >
+                  <SearchIcon className="h-4 w-4" />
+                </button>
               )}
-              {sources.size > 0 && (
-                <span className="text-fg/50">
-                  {" · "}
-                  {sources.size === 1
-                    ? SOURCE_LABEL[[...sources][0]]
-                    : `${sources.size} sources`}
+              <ThemeToggle />
+              <button
+                onClick={() => setSheetOpen(true)}
+                className="flex items-center gap-1.5 rounded-full bg-fg/10 px-3.5 py-1.5 text-sm font-medium text-fg/90 transition hover:bg-fg/20"
+              >
+                {activePill.emoji && <span>{activePill.emoji}</span>}
+                <span>
+                  {activePill.label}
+                  {mode === "latest" && (
+                    <span className="text-fg/50">{" · "}Latest</span>
+                  )}
+                  {sources.size > 0 && (
+                    <span className="text-fg/50">
+                      {" · "}
+                      {sources.size === 1
+                        ? SOURCE_LABEL[[...sources][0]]
+                        : `${sources.size} sources`}
+                    </span>
+                  )}
                 </span>
-              )}
-            </span>
-            <span className="text-fg/40">▾</span>
-          </button>
-        </div>
+                <span className="text-fg/40">▾</span>
+              </button>
+            </div>
+          </>
+        )}
       </header>
 
       {/* Filter picker — a bottom sheet, so the feed stays full-screen */}
@@ -482,7 +586,7 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
 
       <main
         ref={mainRef}
-        key={`${mode}:${filter}:${[...sources].sort().join(",")}`}
+        key={`${mode}:${query}:${filter}:${[...sources].sort().join(",")}`}
         onScroll={(e) => {
           const el = e.currentTarget;
           const i = Math.round(el.scrollTop / el.clientHeight);
@@ -536,7 +640,9 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
             <p>
               {filter === "saved"
                 ? "No saved posts yet — tap the 🔖 on a card to save it."
-                : "Nothing here right now."}
+                : query
+                  ? `No results for “${query}”.`
+                  : "Nothing here right now."}
             </p>
           </div>
         ) : (

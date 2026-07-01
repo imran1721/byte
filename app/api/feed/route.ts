@@ -7,10 +7,12 @@ export async function GET(req: Request) {
   const params = new URL(req.url).searchParams;
   const page = Number(params.get("page") ?? "0");
   const mode = params.get("mode") === "latest" ? "latest" : "trending";
+  const query = params.get("q") ?? "";
   try {
     const items = await getFeedPage(
       Number.isFinite(page) ? Math.max(0, page) : 0,
       mode,
+      query,
     );
     return NextResponse.json({ items });
   } catch (err) {

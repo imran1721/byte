@@ -43,15 +43,23 @@ function mapRepo(repo: GhRepo): FeedItem {
   };
 }
 
-export async function fetchGitHub(page = 0): Promise<FeedItem[]> {
-  // Last 90 days so there are enough pages to scroll through (GitHub Search
-  // caps at 1000 results — ~100 pages here). `page` is 1-indexed.
-  const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10);
-  const query = `created:>${since} stars:>50`;
+export async function fetchGitHub(page = 0, query = ""): Promise<FeedItem[]> {
+  const q = query.trim();
+  // search: repos matching the term, most-starred first (any age, ≥10 stars).
+  // default: last 90 days ordered by stars — brand-new projects gaining
+  // traction. GitHub Search caps at 1000 results (~100 pages). `page` is
+  // 1-indexed.
+  let ghQuery: string;
+  if (q) {
+    ghQuery = `${q} stars:>10`;
+  } else {
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    ghQuery = `created:>${since} stars:>50`;
+  }
   const url =
-    `${SEARCH}?q=${encodeURIComponent(query)}` +
+    `${SEARCH}?q=${encodeURIComponent(ghQuery)}` +
     `&sort=stars&order=desc&per_page=10&page=${page + 1}`;
 
   const headers: Record<string, string> = {

@@ -55,22 +55,30 @@ const PER_PAGE = 12;
 export async function fetchHackerNews(
   page = 0,
   mode: FeedMode = "trending",
+  query = "",
 ): Promise<FeedItem[]> {
-  const latest = mode === "latest";
+  const q = query.trim();
+  const latest = mode === "latest" && !q;
+  // search: full-text over all stories, relevance-ranked, no points floor.
+  // latest: /search_by_date, newest stories first, no floor.
   // trending: Show HN + front-page, relevance/points-ranked, min 10 points.
-  // latest: /search_by_date returns newest stories first, no popularity floor
-  //   (brand-new posts haven't earned points yet). Both paginate ~endlessly.
   const endpoint = latest ? "search_by_date" : "search";
-  const tags = latest ? "story" : "(show_hn,front_page)";
-  const url =
-    `${ALGOLIA}/${endpoint}?tags=${encodeURIComponent(tags)}` +
-    `&page=${page}&hitsPerPage=${PER_PAGE}`;
+  const tags = q || latest ? "story" : "(show_hn,front_page)";
+  const params = new URLSearchParams({
+    tags,
+    page: String(page),
+    hitsPerPage: String(PER_PAGE),
+  });
+  if (q) params.set("query", q);
+  const url = `${ALGOLIA}/${endpoint}?${params}`;
 
-  // Refresh the "latest" cache more often so it actually surfaces new posts.
-  const res = await fetch(url, { next: { revalidate: latest ? 300 : 1800 } });
+  // Search/latest change often, so cache them for less time.
+  const res = await fetch(url, {
+    next: { revalidate: latest || q ? 300 : 1800 },
+  });
   if (!res.ok) throw new Error(`Hacker News API ${res.status}`);
 
-  const floor = latest ? 0 : MIN_POINTS;
+  const floor = latest || q ? 0 : MIN_POINTS;
   const data = (await res.json()) as AlgoliaResponse;
   return data.hits
     .map(mapHit)

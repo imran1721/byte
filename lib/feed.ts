@@ -30,13 +30,17 @@ function rank(item: FeedItem): number {
 export async function getFeedPage(
   page = 0,
   mode: FeedMode = "trending",
+  query = "",
 ): Promise<FeedItem[]> {
   const first = page === 0;
+  const q = query.trim().slice(0, 100);
+  // Only HN and GitHub have real full-text search; when searching we query just
+  // those two rather than pad results with non-matching trending items.
   const results = await Promise.allSettled([
-    fetchHackerNews(page, mode),
-    fetchGitHub(page),
-    fetchDevto(page),
-    ...(first
+    fetchHackerNews(page, mode, q),
+    fetchGitHub(page, q),
+    ...(q ? [] : [fetchDevto(page)]),
+    ...(first && !q
       ? [fetchLobsters(), fetchReddit(), fetchProductHunt()]
       : []),
   ]);
@@ -58,8 +62,9 @@ export async function getFeedPage(
   });
 
   for (const item of deduped) item.score = rank(item);
-  // Latest: strict newest-first. Trending: popular-and-fresh score.
-  if (mode === "latest") deduped.sort((a, b) => b.createdAt - a.createdAt);
+  // Latest: strict newest-first. Trending/search: popular-and-fresh score
+  // (surfaces the most notable matches first).
+  if (mode === "latest" && !q) deduped.sort((a, b) => b.createdAt - a.createdAt);
   else deduped.sort((a, b) => b.score - a.score);
 
   // Fill missing blurbs/images for this page's items.

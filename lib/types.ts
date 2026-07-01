@@ -8,6 +8,9 @@ export type Source =
   | "reddit"
   | "producthunt";
 
+/** Feed ordering: popular-and-fresh ("trending") vs newest-first ("latest"). */
+export type FeedMode = "trending" | "latest";
+
 export interface FeedItem {
   id: string;
   source: Source;

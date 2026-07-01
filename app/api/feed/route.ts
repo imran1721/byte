@@ -4,9 +4,14 @@ import { getFeedPage } from "@/lib/feed";
 export const revalidate = 1800;
 
 export async function GET(req: Request) {
-  const page = Number(new URL(req.url).searchParams.get("page") ?? "0");
+  const params = new URL(req.url).searchParams;
+  const page = Number(params.get("page") ?? "0");
+  const mode = params.get("mode") === "latest" ? "latest" : "trending";
   try {
-    const items = await getFeedPage(Number.isFinite(page) ? Math.max(0, page) : 0);
+    const items = await getFeedPage(
+      Number.isFinite(page) ? Math.max(0, page) : 0,
+      mode,
+    );
     return NextResponse.json({ items });
   } catch (err) {
     console.error("[api/feed]", err);

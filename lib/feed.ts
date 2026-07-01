@@ -1,4 +1,4 @@
-import type { FeedItem } from "@/lib/types";
+import type { FeedItem, FeedMode } from "@/lib/types";
 import { fetchHackerNews } from "@/lib/sources/hackernews";
 import { fetchGitHub } from "@/lib/sources/github";
 import { fetchLobsters } from "@/lib/sources/lobsters";
@@ -27,10 +27,13 @@ function rank(item: FeedItem): number {
  * page 0 for variety up top. Each page is ranked within itself and the client
  * appends pages, so already-shown items never reorder.
  */
-export async function getFeedPage(page = 0): Promise<FeedItem[]> {
+export async function getFeedPage(
+  page = 0,
+  mode: FeedMode = "trending",
+): Promise<FeedItem[]> {
   const first = page === 0;
   const results = await Promise.allSettled([
-    fetchHackerNews(page),
+    fetchHackerNews(page, mode),
     fetchGitHub(page),
     fetchDevto(page),
     ...(first
@@ -55,7 +58,9 @@ export async function getFeedPage(page = 0): Promise<FeedItem[]> {
   });
 
   for (const item of deduped) item.score = rank(item);
-  deduped.sort((a, b) => b.score - a.score);
+  // Latest: strict newest-first. Trending: popular-and-fresh score.
+  if (mode === "latest") deduped.sort((a, b) => b.createdAt - a.createdAt);
+  else deduped.sort((a, b) => b.score - a.score);
 
   // Fill missing blurbs/images for this page's items.
   await enrichDescriptions(deduped);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { FeedItem, Source } from "@/lib/types";
+import type { FeedItem, FeedMode, Source } from "@/lib/types";
 import type { CategoryId } from "@/lib/categorize";
 import { CATEGORY_META, CATEGORY_ORDER } from "@/lib/categoryMeta";
 import Card from "@/components/Card";
@@ -29,6 +29,7 @@ const PAGINATING = new Set<Source>(["hackernews", "github", "devto"]);
 
 export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
   const [filter, setFilter] = useState<Filter>("all");
+  const [mode, setMode] = useState<FeedMode>("trending"); // trending vs latest
   const [sources, setSources] = useState<Set<Source>>(new Set()); // empty = all
   const [idx, setIdx] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -52,7 +53,7 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
     loadingRef.current = true;
     setLoadingMore(true);
     try {
-      const res = await fetch(`/api/feed?page=${pageRef.current}`);
+      const res = await fetch(`/api/feed?page=${pageRef.current}&mode=${mode}`);
       const data = (await res.json()) as { items?: FeedItem[] };
       const incoming = data.items ?? [];
       pageRef.current += 1;
@@ -84,7 +85,7 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
     setRefreshing(true);
     try {
       // cache-bust so the route re-runs and surfaces anything new
-      const res = await fetch(`/api/feed?page=0&t=${Date.now()}`);
+      const res = await fetch(`/api/feed?page=0&mode=${mode}&t=${Date.now()}`);
       const data = (await res.json()) as { items?: FeedItem[] };
       const fresh = (data.items ?? []).filter((it) => !seenRef.current.has(it.id));
       fresh.forEach((it) => seenRef.current.add(it.id));
@@ -93,6 +94,31 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
       mainRef.current?.scrollTo({ top: 0 });
     } catch {
       /* ignore — user can pull again */
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Switch trending ⇄ latest: replace the feed with a fresh page 0 in the new
+  // mode and restart pagination. Reuses the refresh spinner while it loads.
+  const switchMode = async (m: FeedMode) => {
+    setSheetOpen(false);
+    if (m === mode || refreshing) return;
+    setMode(m);
+    setRefreshing(true);
+    try {
+      const res = await fetch(`/api/feed?page=0&mode=${m}&t=${Date.now()}`);
+      const data = (await res.json()) as { items?: FeedItem[] };
+      const incoming = data.items ?? [];
+      seenRef.current = new Set(incoming.map((i) => i.id));
+      pageRef.current = 1;
+      setItems(incoming);
+      setDone(false);
+      setCount(PAGE);
+      setIdx(0);
+      mainRef.current?.scrollTo({ top: 0 });
+    } catch {
+      /* ignore — user can try again */
     } finally {
       setRefreshing(false);
     }
@@ -285,6 +311,9 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
             {activePill.emoji && <span>{activePill.emoji}</span>}
             <span>
               {activePill.label}
+              {mode === "latest" && (
+                <span className="text-fg/50">{" · "}Latest</span>
+              )}
               {sources.size > 0 && (
                 <span className="text-fg/50">
                   {" · "}
@@ -316,6 +345,30 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
           }`}
         >
           <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-fg/20" />
+
+          <h2 className="mb-3 text-lg font-bold">Show</h2>
+          <div className="mb-7 flex gap-2">
+            {(
+              [
+                { id: "trending", label: "Trending", emoji: "🔥" },
+                { id: "latest", label: "Latest", emoji: "🕒" },
+              ] as const
+            ).map((m) => (
+              <button
+                key={m.id}
+                onClick={() => switchMode(m.id)}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition ${
+                  mode === m.id
+                    ? "bg-fg text-bg"
+                    : "bg-fg/10 text-fg/70 hover:bg-fg/20"
+                }`}
+              >
+                <span>{m.emoji}</span>
+                <span>{m.label}</span>
+              </button>
+            ))}
+          </div>
+
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-bold">Browse</h2>
             {interests && (
@@ -429,7 +482,7 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
 
       <main
         ref={mainRef}
-        key={`${filter}:${[...sources].sort().join(",")}`}
+        key={`${mode}:${filter}:${[...sources].sort().join(",")}`}
         onScroll={(e) => {
           const el = e.currentTarget;
           const i = Math.round(el.scrollTop / el.clientHeight);

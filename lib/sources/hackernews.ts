@@ -1,4 +1,4 @@
-import type { FeedItem } from "@/lib/types";
+import type { FeedItem, FeedMode } from "@/lib/types";
 import { stripHtml, truncate } from "@/lib/html";
 
 /**
@@ -52,18 +52,27 @@ function mapHit(hit: AlgoliaHit): FeedItem | null {
 const MIN_POINTS = 10;
 const PER_PAGE = 12;
 
-export async function fetchHackerNews(page = 0): Promise<FeedItem[]> {
-  // "Show HN" + front-page stories, relevance-ranked and paginated. No date
-  // filter — the index has ~250 pages, which is what makes the feed endless.
+export async function fetchHackerNews(
+  page = 0,
+  mode: FeedMode = "trending",
+): Promise<FeedItem[]> {
+  const latest = mode === "latest";
+  // trending: Show HN + front-page, relevance/points-ranked, min 10 points.
+  // latest: /search_by_date returns newest stories first, no popularity floor
+  //   (brand-new posts haven't earned points yet). Both paginate ~endlessly.
+  const endpoint = latest ? "search_by_date" : "search";
+  const tags = latest ? "story" : "(show_hn,front_page)";
   const url =
-    `${ALGOLIA}/search?tags=${encodeURIComponent("(show_hn,front_page)")}` +
+    `${ALGOLIA}/${endpoint}?tags=${encodeURIComponent(tags)}` +
     `&page=${page}&hitsPerPage=${PER_PAGE}`;
 
-  const res = await fetch(url, { next: { revalidate: 1800 } });
+  // Refresh the "latest" cache more often so it actually surfaces new posts.
+  const res = await fetch(url, { next: { revalidate: latest ? 300 : 1800 } });
   if (!res.ok) throw new Error(`Hacker News API ${res.status}`);
 
+  const floor = latest ? 0 : MIN_POINTS;
   const data = (await res.json()) as AlgoliaResponse;
   return data.hits
     .map(mapHit)
-    .filter((x): x is FeedItem => x !== null && x.points >= MIN_POINTS);
+    .filter((x): x is FeedItem => x !== null && x.points >= floor);
 }

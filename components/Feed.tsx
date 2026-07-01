@@ -341,7 +341,9 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
         />
       )}
 
-      {/* Header: logo, an expandable search bar, theme toggle, filter trigger */}
+      {/* Header: logo, an expandable search bar, theme toggle, filter trigger.
+          The search field only grows into the free space — the toggle and
+          filter button stay visible. */}
       <header className="fixed inset-x-0 top-0 z-20 flex items-center gap-2 bg-gradient-to-b from-bg/90 to-transparent px-6 pb-5 pt-4">
         {searchOpen ? (
           <form
@@ -350,7 +352,7 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
               runSearch(searchInput);
               (document.activeElement as HTMLElement | null)?.blur();
             }}
-            className="flex w-full items-center gap-2 rounded-full bg-fg/10 px-4 py-2"
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-fg/10 px-3 py-2"
           >
             <SearchIcon className="h-4 w-4 shrink-0 text-fg/40" />
             {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
@@ -360,8 +362,8 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
               enterKeyHint="search"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search Hacker News & GitHub…"
-              className="w-full bg-transparent text-sm text-fg outline-none placeholder:text-fg/40"
+              placeholder="Search…"
+              className="w-full min-w-0 bg-transparent text-sm text-fg outline-none placeholder:text-fg/40"
             />
             <button
               type="button"
@@ -377,59 +379,58 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
           </form>
         ) : (
           <>
-            <ByteIcon className="h-8 w-8" />
-            <div className="ml-auto flex items-center gap-2">
-              {query ? (
-                <button
-                  onClick={() => {
-                    setSearchInput(query);
-                    setSearchOpen(true);
-                  }}
-                  aria-label="Edit search"
-                  className="flex items-center gap-1.5 rounded-full bg-fg/10 px-3 py-1.5 text-sm font-medium text-fg/90 transition hover:bg-fg/20"
-                >
-                  <SearchIcon className="h-4 w-4 text-fg/60" />
-                  <span className="inline-block max-w-[7rem] truncate align-bottom">
-                    {query}
-                  </span>
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    setSearchInput("");
-                    setSearchOpen(true);
-                  }}
-                  aria-label="Search"
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-fg/10 text-fg/90 transition hover:bg-fg/20"
-                >
-                  <SearchIcon className="h-4 w-4" />
-                </button>
-              )}
-              <ThemeToggle />
+            <ByteIcon className="h-8 w-8 shrink-0" />
+            {query ? (
               <button
-                onClick={() => setSheetOpen(true)}
-                className="flex items-center gap-1.5 rounded-full bg-fg/10 px-3.5 py-1.5 text-sm font-medium text-fg/90 transition hover:bg-fg/20"
+                onClick={() => {
+                  setSearchInput(query);
+                  setSearchOpen(true);
+                }}
+                aria-label="Edit search"
+                className="ml-auto flex min-w-0 items-center gap-1.5 rounded-full bg-fg/10 px-3 py-1.5 text-sm font-medium text-fg/90 transition hover:bg-fg/20"
               >
-                {activePill.emoji && <span>{activePill.emoji}</span>}
-                <span>
-                  {activePill.label}
-                  {mode === "latest" && (
-                    <span className="text-fg/50">{" · "}Latest</span>
-                  )}
-                  {sources.size > 0 && (
-                    <span className="text-fg/50">
-                      {" · "}
-                      {sources.size === 1
-                        ? SOURCE_LABEL[[...sources][0]]
-                        : `${sources.size} sources`}
-                    </span>
-                  )}
-                </span>
-                <span className="text-fg/40">▾</span>
+                <SearchIcon className="h-4 w-4 shrink-0 text-fg/60" />
+                <span className="truncate">{query}</span>
               </button>
-            </div>
+            ) : (
+              <button
+                onClick={() => {
+                  setSearchInput("");
+                  setSearchOpen(true);
+                }}
+                aria-label="Search"
+                className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-fg/10 text-fg/90 transition hover:bg-fg/20"
+              >
+                <SearchIcon className="h-4 w-4" />
+              </button>
+            )}
           </>
         )}
+
+        <div className="shrink-0">
+          <ThemeToggle />
+        </div>
+        <button
+          onClick={() => setSheetOpen(true)}
+          className="flex shrink-0 items-center gap-1.5 rounded-full bg-fg/10 px-3.5 py-1.5 text-sm font-medium text-fg/90 transition hover:bg-fg/20"
+        >
+          {activePill.emoji && <span>{activePill.emoji}</span>}
+          <span>
+            {activePill.label}
+            {mode === "latest" && (
+              <span className="text-fg/50">{" · "}Latest</span>
+            )}
+            {sources.size > 0 && (
+              <span className="text-fg/50">
+                {" · "}
+                {sources.size === 1
+                  ? SOURCE_LABEL[[...sources][0]]
+                  : `${sources.size} sources`}
+              </span>
+            )}
+          </span>
+          <span className="text-fg/40">▾</span>
+        </button>
       </header>
 
       {/* Filter picker — a bottom sheet, so the feed stays full-screen */}

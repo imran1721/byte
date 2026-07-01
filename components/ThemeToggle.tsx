@@ -10,13 +10,36 @@ const MAX_DIST = 300; // how far the bead can be pulled
 const BEAD = 24; // bead diameter
 const HAPTIC_STEP = 16; // px of stretch between bead "ticks"
 
-// Web Vibration API — a no-op where unsupported (e.g. iOS Safari, desktop).
+// iOS Safari ignores navigator.vibrate entirely. Its ONLY web-exposed haptic
+// is the native switch control: toggling an <input type="checkbox" switch>
+// inside a user gesture fires a light tap (iOS 17.4+). We keep one hidden
+// off-screen switch and "click" it. No-ops on browsers that don't render it.
+let iosSwitch: HTMLInputElement | null = null;
+function iosHaptic() {
+  if (typeof document === "undefined") return;
+  if (!iosSwitch) {
+    const label = document.createElement("label");
+    label.setAttribute("aria-hidden", "true");
+    label.style.cssText =
+      "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden";
+    iosSwitch = document.createElement("input");
+    iosSwitch.type = "checkbox";
+    iosSwitch.setAttribute("switch", ""); // native iOS switch → haptic on toggle
+    label.appendChild(iosSwitch);
+    document.body.appendChild(label);
+  }
+  iosSwitch.click(); // the native toggle is what triggers the tap
+}
+
+// Best-effort haptic: Vibration API where supported (Android/desktop), plus the
+// iOS switch trick. Both are no-ops where unsupported, so calling both is safe.
 function buzz(ms: number) {
   try {
     navigator.vibrate?.(ms);
   } catch {
     /* unsupported */
   }
+  iosHaptic();
 }
 
 // Spring constants (per-frame) — lightly underdamped: a couple of bounces then
@@ -145,6 +168,7 @@ export default function ThemeToggle() {
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
+      buzz(14);
       flip();
       pos.current = { x: 0, y: REST + 20 };
       vel.current = { x: 0, y: 0 };

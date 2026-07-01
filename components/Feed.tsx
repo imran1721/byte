@@ -354,7 +354,9 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
               runSearch(searchInput);
               (document.activeElement as HTMLElement | null)?.blur();
             }}
-            className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-fg/10 px-3 py-2"
+            // h-8 matches the icon/filter buttons so the header height (and
+            // thus the nav) doesn't shift when the bar opens.
+            className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-full bg-fg/10 px-3"
           >
             <SearchIcon className="h-4 w-4 shrink-0 text-fg/40" />
             {/* eslint-disable-next-line jsx-a11y/no-autofocus */}

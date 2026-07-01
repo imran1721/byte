@@ -2,26 +2,28 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
-// A pull-chain light switch. The bead hangs on a cord and bounces on a spring
-// when toggled. The tappable target is a real <input type="checkbox" switch>
-// overlaid on the bead — on iOS that native control is the ONLY thing that
-// fires the Taptic Engine (Safari has no Vibration API, and the old
-// programmatic switch hack was patched out in iOS 26.5). A genuine finger tap
-// on it buzzes; Android/desktop get navigator.vibrate too.
+// A pull-chain light switch that both TAPS and PULLS:
+//   • Tap the bead → it goes through a real <input type="checkbox" switch>,
+//     the only control that fires the iOS Taptic Engine (Safari has no
+//     Vibration API and the programmatic switch hack died in iOS 26.5). So a
+//     tap buzzes.
+//   • Pull the bead → once the finger actually moves we take over the pointer
+//     and run a draggable pendulum with spring-back; releasing flips the theme.
+//     A drag can't be routed through the native control, so a pull doesn't buzz
+//     on iOS (Android/desktop still get navigator.vibrate).
+// We only hijack the pointer AFTER movement, so an untouched tap stays a clean
+// native toggle and keeps its haptic.
 const REST = 32; // resting distance from anchor to bead centre (px)
+const MAX_DIST = 300; // how far the bead can be pulled
 const BEAD = 24; // bead diameter
-const KICK = 22; // downward bounce given on each toggle
+const DRAG_THRESHOLD = 6; // px of movement before a tap becomes a pull
 
-// Spring constants (per-frame) — lightly underdamped: a couple of bounces then
-// settles (damping ratio ~0.3).
-const STIFFNESS = 0.14;
+const STIFFNESS = 0.14; // lightly underdamped spring: a couple of bounces
 const DAMPING = 0.24;
 
-// Non-iOS vibration. No-op on iOS Safari (unsupported) — the native switch tap
-// covers iOS instead.
 function buzz(ms: number) {
   try {
-    navigator.vibrate?.(ms);
+    navigator.vibrate?.(ms); // no-op on iOS Safari
   } catch {
     /* unsupported */
   }
@@ -29,11 +31,17 @@ function buzz(ms: number) {
 
 export default function ThemeToggle() {
   const [light, setLight] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: REST }); // bead centre vs anchor
 
+  const box = useRef<HTMLDivElement>(null);
+  const down = useRef(false); // a pointer is currently pressed
+  const draggingRef = useRef(false); // escalated to a pull
+  const anchor = useRef({ x: 0, y: 0 });
   const pos = useRef({ x: 0, y: REST });
   const vel = useRef({ x: 0, y: 0 });
   const raf = useRef<number | undefined>(undefined);
+  const skipChange = useRef(false); // a pull already handled the flip; ignore native change
 
   useEffect(() => {
     setLight(document.documentElement.classList.contains("light"));
@@ -42,7 +50,16 @@ export default function ThemeToggle() {
     };
   }, []);
 
-  // Spring the bead back to rest → natural wobble after a kick.
+  const applyTheme = (next: boolean) => {
+    const root = document.documentElement;
+    root.classList.add("theme-transition"); // smooth colour crossfade
+    setLight(next);
+    root.classList.toggle("light", next);
+    localStorage.setItem("byte:theme", next ? "light" : "dark");
+    window.setTimeout(() => root.classList.remove("theme-transition"), 350);
+  };
+
+  // Spring the bead back to rest → natural wobble, carrying release velocity.
   const startSpring = () => {
     if (raf.current) cancelAnimationFrame(raf.current);
     const step = () => {
@@ -68,21 +85,75 @@ export default function ThemeToggle() {
     raf.current = requestAnimationFrame(step);
   };
 
-  // Fired by the native switch toggling (real tap / keyboard). On iOS the tap
-  // itself already buzzed via the Taptic Engine; buzz() covers Android/desktop.
-  const onToggle = () => {
-    const next = !document.documentElement.classList.contains("light");
-    const root = document.documentElement;
-    root.classList.add("theme-transition"); // smooth colour crossfade
-    setLight(next);
-    root.classList.toggle("light", next);
-    localStorage.setItem("byte:theme", next ? "light" : "dark");
-    window.setTimeout(() => root.classList.remove("theme-transition"), 350);
-
+  // TAP path: the native switch toggled from a real tap/keyboard → on iOS the
+  // Taptic Engine already fired. Skip if a pull just handled the flip.
+  const onChange = () => {
+    if (skipChange.current) {
+      skipChange.current = false;
+      return;
+    }
+    applyTheme(!document.documentElement.classList.contains("light"));
     buzz(14);
-    // Kick the bead down so the chain bounces on every flip.
-    pos.current = { x: 0, y: REST + KICK };
+    pos.current = { x: 0, y: REST + 22 }; // kick the chain so it bounces
     vel.current = { x: 0, y: 0 };
+    startSpring();
+  };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    // Don't capture or preventDefault yet — keep the native tap path clean.
+    if (raf.current) cancelAnimationFrame(raf.current);
+    const r = box.current!.getBoundingClientRect();
+    anchor.current = { x: r.left + r.width / 2, y: r.top };
+    down.current = true;
+    draggingRef.current = false;
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!down.current) return;
+    let dx = e.clientX - anchor.current.x;
+    let dy = e.clientY - anchor.current.y;
+
+    // Escalate a press into a pull the moment the finger leaves the rest point.
+    if (!draggingRef.current) {
+      if (Math.hypot(dx, dy - REST) <= DRAG_THRESHOLD) return;
+      draggingRef.current = true;
+      setDragging(true);
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        /* not all pointers capturable */
+      }
+    }
+    e.preventDefault(); // now it's a pull — suppress the native toggle
+
+    const d = Math.hypot(dx, dy);
+    if (d > MAX_DIST) {
+      dx = (dx / d) * MAX_DIST;
+      dy = (dy / d) * MAX_DIST;
+    }
+    let vx = dx - pos.current.x;
+    let vy = dy - pos.current.y;
+    const vmag = Math.hypot(vx, vy);
+    const VMAX = 28; // clamp so a fast fling can't send the spring wild
+    if (vmag > VMAX) {
+      vx = (vx / vmag) * VMAX;
+      vy = (vy / vmag) * VMAX;
+    }
+    vel.current = { x: vx, y: vy };
+    pos.current = { x: dx, y: dy };
+    setOffset({ x: dx, y: dy });
+  };
+
+  const onPointerUp = () => {
+    if (!down.current) return;
+    down.current = false;
+    if (!draggingRef.current) return; // a tap — let the native onChange handle it
+    draggingRef.current = false;
+    setDragging(false);
+    skipChange.current = true; // a stray native change may follow; ignore it
+    window.setTimeout(() => (skipChange.current = false), 0);
+    applyTheme(!document.documentElement.classList.contains("light"));
+    buzz(14);
     startSpring();
   };
 
@@ -108,8 +179,13 @@ export default function ThemeToggle() {
   };
 
   return (
-    <div className="relative -mt-4 h-11 w-6 select-none">
-      {/* Visual pull-chain — purely decorative; the input below takes the tap. */}
+    <div
+      ref={box}
+      className={`relative -mt-4 h-11 w-6 touch-none select-none ${
+        dragging ? "cursor-grabbing" : "cursor-grab"
+      }`}
+    >
+      {/* Visual pull-chain — decorative; the input below owns the pointer. */}
       <span className="pointer-events-none absolute inset-0 text-fg/40">
         <span style={cordStyle} />
         <span
@@ -125,19 +201,23 @@ export default function ThemeToggle() {
         </span>
       </span>
 
-      {/* The real native switch: a genuine tap here fires the iOS Taptic Engine.
-          Invisible (opacity 0) but hit-testable; sized as a comfortable target
-          over the resting bead. `switch` is set via ref so React keeps it. */}
+      {/* Real native switch: a plain tap fires the iOS Taptic Engine. It also
+          receives the pointer, so a drag becomes the pull (handlers above).
+          `switch` is set via ref so React keeps the attribute. */}
       <input
         type="checkbox"
         role="switch"
         checked={light}
-        onChange={onToggle}
+        onChange={onChange}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
         ref={(el) => el?.setAttribute("switch", "")}
         aria-label={light ? "Turn off the lights" : "Turn on the lights"}
-        title="Tap the chain to switch theme"
-        className="absolute left-1/2 h-11 w-11 -translate-x-1/2 cursor-pointer opacity-0"
-        style={{ top: REST - 22 }}
+        title="Tap or pull the chain to switch theme"
+        className="absolute left-1/2 h-11 w-11 -translate-x-1/2 opacity-0"
+        style={{ top: REST - 22, cursor: "inherit" }}
       />
     </div>
   );

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Haptic test</title>
+<style>
+  body { font: 16px/1.5 -apple-system, system-ui, sans-serif; margin: 0; padding: 24px; background: #0a0a0a; color: #fafafa; }
+  h1 { font-size: 20px; }
+  .card { background: #171717; border: 1px solid #333; border-radius: 14px; padding: 18px; margin: 14px 0; }
+  button { font-size: 17px; padding: 14px 18px; border-radius: 12px; border: 0; background: #2bc9a0; color: #04140f; font-weight: 600; width: 100%; }
+  /* The ground-truth control: a REAL native iOS switch. Big tap target. */
+  input[type=checkbox][switch] { width: 64px; height: 38px; transform: scale(1.6); margin: 8px 40px; }
+  label { display: flex; align-items: center; gap: 20px; font-weight: 600; }
+  #log { white-space: pre-wrap; font: 13px ui-monospace, monospace; color: #8fd; background: #04140f; border-radius: 10px; padding: 12px; min-height: 40px; }
+  .muted { color: #999; font-size: 14px; }
+</style>
+</head>
+<body>
+  <h1>iOS haptic ground-truth test</h1>
+
+  <div class="card">
+    <p><b>1. The real native switch.</b> Tap it with your finger. This is the only thing iOS 26.5+ can buzz. <b>No buzz here = your device/OS can't do web haptics at all</b> (check the setting below).</p>
+    <label>
+      <input type="checkbox" switch id="sw" />
+      <span>Tap me &nbsp;⟶</span>
+    </label>
+  </div>
+
+  <div class="card">
+    <p><b>2. Vibration API</b> (works on Android, never on iOS Safari):</p>
+    <button id="vib">navigator.vibrate(200)</button>
+  </div>
+
+  <div class="card">
+    <p><b>3. The old programmatic hack</b> (label-click; patched out in iOS 26.5):</p>
+    <button id="hack">Trigger via hidden &lt;label&gt;</button>
+  </div>
+
+  <div class="card">
+    <b>Diagnostics</b>
+    <div id="log"></div>
+    <p class="muted">If the native switch (#1) doesn't buzz: open <b>Settings → Sounds &amp; Haptics → System Haptics</b> and make sure it's ON, and that you're not in Low Power Mode. Silent/ring switch does not affect it.</p>
+  </div>
+
+<script>
+  var log = document.getElementById('log');
+  function line(s){ log.textContent += s + "\n"; }
+
+  line("UA: " + navigator.userAgent);
+  line("navigator.vibrate supported: " + ('vibrate' in navigator));
+  var m = navigator.userAgent.match(/OS (\d+)[_.](\d+)/);
+  line("iOS version (guess): " + (m ? m[1] + "." + m[2] : "n/a"));
+
+  document.getElementById('sw').addEventListener('change', function(){
+    line("native switch toggled — did you feel a tap?");
+  });
+
+  document.getElementById('vib').addEventListener('click', function(){
+    var ok = false;
+    try { ok = navigator.vibrate ? navigator.vibrate(200) : false; } catch(e) { line("vibrate error: " + e); }
+    line("vibrate() returned: " + ok + (('vibrate' in navigator) ? "" : " (API absent — iOS)"));
+  });
+
+  // The pre-26.5 hack: a hidden switch inside a label, click the LABEL.
+  var lbl = document.createElement('label');
+  lbl.style.cssText = 'position:fixed;opacity:0;pointer-events:none;';
+  var inp = document.createElement('input');
+  inp.type = 'checkbox'; inp.setAttribute('switch','');
+  lbl.appendChild(inp); document.body.appendChild(lbl);
+  document.getElementById('hack').addEventListener('click', function(){
+    lbl.click();
+    line("label.click() fired — buzz only on iOS 17.4–26.4");
+  });
+</script>
+</body>
+</html>

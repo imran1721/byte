@@ -1,5 +1,4 @@
 # byte ⚡
-
 **Tech in bite-size** — a vertical, TikTok-style feed of new tools, libraries,
 and projects that people are liking right now, aggregated from across the dev
 web and ranked so the fresh + well-liked stuff floats to the top.

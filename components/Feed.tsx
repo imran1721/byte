@@ -345,6 +345,8 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
           The search field only grows into the free space — the toggle and
           filter button stay visible. */}
       <header className="fixed inset-x-0 top-0 z-20 flex items-center gap-2 bg-gradient-to-b from-bg/90 to-transparent px-6 pb-5 pt-4">
+        <ByteIcon className="h-8 w-8 shrink-0" />
+
         {searchOpen ? (
           <form
             onSubmit={(e) => {
@@ -367,46 +369,55 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
               // input's font is < 16px, which reads as the window resizing.
               className="w-full min-w-0 bg-transparent text-base text-fg outline-none placeholder:text-fg/40"
             />
+            {/* Empty box → close; otherwise clear the text but keep typing. */}
             <button
               type="button"
-              aria-label="Close search"
+              aria-label={searchInput ? "Clear text" : "Close search"}
               onClick={() => {
-                setSearchOpen(false);
-                clearSearch();
+                if (searchInput) setSearchInput("");
+                else {
+                  setSearchOpen(false);
+                  clearSearch();
+                }
               }}
               className="shrink-0 text-fg/50 transition hover:text-fg"
             >
               ✕
             </button>
           </form>
+        ) : query ? (
+          // Active search collapsed to a chip: tap the label to edit, ✕ to clear.
+          <div className="ml-auto flex min-w-0 items-center rounded-full bg-fg/10">
+            <button
+              onClick={() => {
+                setSearchInput(query);
+                setSearchOpen(true);
+              }}
+              aria-label="Edit search"
+              className="flex min-w-0 items-center gap-1.5 py-1.5 pl-3 pr-1.5 text-sm font-medium text-fg/90"
+            >
+              <SearchIcon className="h-4 w-4 shrink-0 text-fg/60" />
+              <span className="truncate">{query}</span>
+            </button>
+            <button
+              onClick={clearSearch}
+              aria-label="Clear search"
+              className="shrink-0 rounded-full py-1.5 pl-1 pr-3 text-fg/50 transition hover:text-fg"
+            >
+              ✕
+            </button>
+          </div>
         ) : (
-          <>
-            <ByteIcon className="h-8 w-8 shrink-0" />
-            {query ? (
-              <button
-                onClick={() => {
-                  setSearchInput(query);
-                  setSearchOpen(true);
-                }}
-                aria-label="Edit search"
-                className="ml-auto flex min-w-0 items-center gap-1.5 rounded-full bg-fg/10 px-3 py-1.5 text-sm font-medium text-fg/90 transition hover:bg-fg/20"
-              >
-                <SearchIcon className="h-4 w-4 shrink-0 text-fg/60" />
-                <span className="truncate">{query}</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  setSearchInput("");
-                  setSearchOpen(true);
-                }}
-                aria-label="Search"
-                className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-fg/10 text-fg/90 transition hover:bg-fg/20"
-              >
-                <SearchIcon className="h-4 w-4" />
-              </button>
-            )}
-          </>
+          <button
+            onClick={() => {
+              setSearchInput("");
+              setSearchOpen(true);
+            }}
+            aria-label="Search"
+            className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-fg/10 text-fg/90 transition hover:bg-fg/20"
+          >
+            <SearchIcon className="h-4 w-4" />
+          </button>
         )}
 
         <div className="shrink-0">

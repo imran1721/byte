@@ -71,6 +71,33 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
     }
   };
 
+  // Pull-to-refresh: drag down on the first card to fetch fresh page-0 posts.
+  const [pull, setPull] = useState(0); // current pull distance (px)
+  const [pulling, setPulling] = useState(false); // finger down and pulling
+  const [refreshing, setRefreshing] = useState(false);
+  const pullStart = useRef<number | null>(null);
+  const pullRef = useRef(0);
+  const PULL_TRIGGER = 64;
+
+  const refresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      // cache-bust so the route re-runs and surfaces anything new
+      const res = await fetch(`/api/feed?page=0&t=${Date.now()}`);
+      const data = (await res.json()) as { items?: FeedItem[] };
+      const fresh = (data.items ?? []).filter((it) => !seenRef.current.has(it.id));
+      fresh.forEach((it) => seenRef.current.add(it.id));
+      if (fresh.length) setItems((prev) => [...fresh, ...prev]);
+      setCount(PAGE);
+      mainRef.current?.scrollTo({ top: 0 });
+    } catch {
+      /* ignore — user can pull again */
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   // null = not loaded yet, [] never stored (we only save 3+). First-time users
   // (nothing in localStorage) get the onboarding interest picker.
   const [interests, setInterests] = useState<CategoryId[] | null>(null);
@@ -371,6 +398,35 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
         <span className="animate-bounce text-2xl leading-none">⌄</span>
       </div>
 
+      {/* Pull-to-refresh indicator — fades in below the header as you pull. */}
+      <div
+        className="pointer-events-none fixed left-1/2 top-14 z-30 -translate-x-1/2"
+        style={{ opacity: refreshing ? 1 : Math.min(pull / PULL_TRIGGER, 1) }}
+      >
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-fg/10 text-fg shadow-lg backdrop-blur">
+          <svg
+            viewBox="0 0 24 24"
+            className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            style={{
+              transform: refreshing
+                ? undefined
+                : `rotate(${pull >= PULL_TRIGGER ? 180 : 0}deg)`,
+              transition: "transform 0.2s ease",
+            }}
+          >
+            {refreshing ? (
+              <path d="M21 12a9 9 0 1 1-2.6-6.3" />
+            ) : (
+              <path d="M12 5v14M6 13l6 6 6-6" />
+            )}
+          </svg>
+        </div>
+      </div>
+
       <main
         ref={mainRef}
         key={`${filter}:${[...sources].sort().join(",")}`}
@@ -386,6 +442,39 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
           // this view has a fixed pool: single non-paginating source, or Saved).
           if (i >= visible.length - 10 && !sourceExhausted && filter !== "saved")
             loadMore();
+        }}
+        onTouchStart={(e) => {
+          const el = e.currentTarget;
+          if (el.scrollTop <= 0 && filter !== "saved" && !refreshing)
+            pullStart.current = e.touches[0].clientY;
+        }}
+        onTouchMove={(e) => {
+          if (pullStart.current == null) return;
+          const el = e.currentTarget;
+          const dy = e.touches[0].clientY - pullStart.current;
+          if (dy <= 0 || el.scrollTop > 0) {
+            pullStart.current = null;
+            pullRef.current = 0;
+            setPull(0);
+            setPulling(false);
+            return;
+          }
+          setPulling(true);
+          const p = Math.min(dy * 0.5, 100); // resistance + cap
+          pullRef.current = p;
+          setPull(p);
+        }}
+        onTouchEnd={() => {
+          if (pullStart.current == null) return;
+          pullStart.current = null;
+          setPulling(false);
+          if (pullRef.current >= PULL_TRIGGER) refresh();
+          pullRef.current = 0;
+          setPull(0);
+        }}
+        style={{
+          transform: `translateY(${refreshing ? PULL_TRIGGER : pull}px)`,
+          transition: pulling ? "none" : "transform 0.3s ease",
         }}
         className="no-scrollbar h-[100dvh] snap-y snap-mandatory overflow-y-scroll"
       >

@@ -454,7 +454,7 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
           <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-fg/20" />
 
           <h2 className="mb-3 text-lg font-bold">Show</h2>
-          <div className="mb-7 flex gap-2">
+          <div className="mb-7 flex flex-wrap gap-2">
             {(
               [
                 { id: "trending", label: "Trending", emoji: "🔥" },
@@ -464,7 +464,7 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
               <button
                 key={m.id}
                 onClick={() => switchMode(m.id)}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition ${
+                className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition ${
                   mode === m.id
                     ? "bg-fg text-bg"
                     : "bg-fg/10 text-fg/70 hover:bg-fg/20"

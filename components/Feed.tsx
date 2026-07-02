@@ -8,6 +8,7 @@ import Card from "@/components/Card";
 import Onboarding from "@/components/Onboarding";
 import ByteIcon from "@/components/ByteIcon";
 import ThemeToggle from "@/components/ThemeToggle";
+import Feedback from "@/components/Feedback";
 
 type Filter = "all" | "foryou" | "saved" | CategoryId;
 
@@ -554,6 +555,9 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
               );
             })}
           </div>
+
+          {/* Feedback — renders nothing unless NEXT_PUBLIC_TALLY_FORM_ID is set */}
+          <Feedback />
         </div>
       </div>
 

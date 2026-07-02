@@ -5,7 +5,11 @@ export type Source =
   | "github"
   | "lobsters"
   | "devto"
-  | "producthunt";
+  | "producthunt"
+  | "npm"
+  | "pypi"
+  | "dockerhub"
+  | "awesome";
 
 /** Feed ordering: popular-and-fresh ("trending") vs newest-first ("latest"). */
 export type FeedMode = "trending" | "latest";
@@ -24,6 +28,9 @@ export interface FeedItem {
   discussionUrl?: string;
   /** Popularity signal: HN points or GitHub stars. */
   points: number;
+  /** Optional popularity value for ranking only, when `points` is on a wildly
+   * different scale (Docker pulls, npm downloads). Display still uses `points`. */
+  rankPoints?: number;
   /** Comment / engagement count where available. */
   comments?: number;
   author?: string;

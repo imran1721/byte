@@ -4,6 +4,10 @@ import { fetchGitHub } from "@/lib/sources/github";
 import { fetchLobsters } from "@/lib/sources/lobsters";
 import { fetchDevto } from "@/lib/sources/devto";
 import { fetchProductHunt } from "@/lib/sources/producthunt";
+import { fetchNpm } from "@/lib/sources/npm";
+import { fetchPyPI } from "@/lib/sources/pypi";
+import { fetchDockerHub } from "@/lib/sources/dockerhub";
+import { fetchAwesome } from "@/lib/sources/awesome";
 import { enrichDescriptions } from "@/lib/enrich";
 import { categorize } from "@/lib/categorize";
 
@@ -14,7 +18,10 @@ import { categorize } from "@/lib/categorize";
  */
 function rank(item: FeedItem): number {
   const ageHours = Math.max(0, (Date.now() / 1000 - item.createdAt) / 3600);
-  const popularity = Math.log10(item.points + 1) + 1;
+  // Sources on wildly different scales (Docker pulls, npm downloads) supply a
+  // normalized rankPoints; everything else ranks on its raw points.
+  const pts = item.rankPoints ?? item.points;
+  const popularity = Math.log10(pts + 1) + 1;
   const gravity = 1.5;
   return popularity / Math.pow(ageHours + 2, gravity / 4);
 }
@@ -22,9 +29,10 @@ function rank(item: FeedItem): number {
 /**
  * One page of the feed. Paginating sources (HN, GitHub, Dev.to) fetch their
  * `page`; HN alone has ~250 pages, so the feed effectively never runs out.
- * Non-paginating sources (Lobsters, Product Hunt) only contribute on
- * page 0 for variety up top. Each page is ranked within itself and the client
- * appends pages, so already-shown items never reorder.
+ * Non-paginating sources (Lobsters, Product Hunt, npm, PyPI, Docker Hub,
+ * Awesome) only contribute on page 0 for variety up top. Each page is ranked
+ * within itself and the client appends pages, so already-shown items never
+ * reorder.
  */
 export async function getFeedPage(
   page = 0,
@@ -40,7 +48,14 @@ export async function getFeedPage(
     fetchGitHub(page, q),
     ...(q ? [] : [fetchDevto(page)]),
     ...(first && !q
-      ? [fetchLobsters(), fetchProductHunt()]
+      ? [
+          fetchLobsters(),
+          fetchProductHunt(),
+          fetchNpm(),
+          fetchPyPI(),
+          fetchDockerHub(),
+          fetchAwesome(),
+        ]
       : []),
   ]);
 

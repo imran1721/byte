@@ -9,6 +9,10 @@ const SOURCE_META = {
   lobsters: { label: "Lobsters", accent: "#b91c1c", pointLabel: "points" },
   devto: { label: "DEV", accent: "#0ea5e9", pointLabel: "reactions" },
   producthunt: { label: "Product Hunt", accent: "#ff6154", pointLabel: "upvotes" },
+  npm: { label: "npm", accent: "#cb3837", pointLabel: "downloads/wk" },
+  pypi: { label: "PyPI", accent: "#3775a9", pointLabel: "" },
+  dockerhub: { label: "Docker Hub", accent: "#2496ed", pointLabel: "pulls" },
+  awesome: { label: "Awesome", accent: "#fc60a8", pointLabel: "stars" },
 } as const;
 
 export default function Card({
@@ -116,10 +120,12 @@ export default function Card({
 
         {/* Stats */}
         <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-fg/60">
-          <span className="font-semibold text-fg">
-            ▲ {compact(item.points)}{" "}
-            <span className="font-normal text-fg/50">{meta.pointLabel}</span>
-          </span>
+          {item.points > 0 && (
+            <span className="font-semibold text-fg">
+              ▲ {compact(item.points)}{" "}
+              <span className="font-normal text-fg/50">{meta.pointLabel}</span>
+            </span>
+          )}
           {typeof item.comments === "number" && (
             <span>
               💬 {compact(item.comments)}{" "}

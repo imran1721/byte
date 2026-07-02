@@ -21,6 +21,10 @@ const SOURCE_LABEL: Record<Source, string> = {
   devto: "Dev.to",
   lobsters: "Lobsters",
   producthunt: "Product Hunt",
+  npm: "npm",
+  pypi: "PyPI",
+  dockerhub: "Docker Hub",
+  awesome: "Awesome",
 };
 // Sources that paginate deeply; the rest only seed page 0, so filtering to them
 // alone has a fixed pool (no point fetching more once you reach the end).
@@ -268,6 +272,10 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
       "devto",
       "lobsters",
       "producthunt",
+      "npm",
+      "pypi",
+      "dockerhub",
+      "awesome",
     ];
     return order.filter((s) => present.has(s));
   }, [items]);

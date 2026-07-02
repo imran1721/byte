@@ -421,9 +421,6 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
           </button>
         )}
 
-        <Feedback className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-fg/10 text-sm leading-none transition hover:bg-fg/20">
-          💬
-        </Feedback>
         <div className="shrink-0">
           <ThemeToggle />
         </div>
@@ -449,6 +446,12 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
           <span className="text-fg/40">▾</span>
         </button>
       </header>
+
+      {/* Feedback — a vertical tab pinned to the right edge, out of the nav.
+          z-20 so the bottom-sheet backdrop (z-30) hides it while open. */}
+      <Feedback className="fixed right-0 top-1/2 z-20 -translate-y-1/2 rounded-l-lg bg-[#2bbd8f] px-1.5 py-3 text-xs font-semibold tracking-wide text-white shadow-lg transition hover:bg-[#25a97f] [writing-mode:vertical-rl]">
+        Feedback
+      </Feedback>
 
       {/* Filter picker — a bottom sheet, so the feed stays full-screen */}
       <div

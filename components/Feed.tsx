@@ -421,6 +421,9 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
           </button>
         )}
 
+        <Feedback className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-fg/10 text-sm leading-none transition hover:bg-fg/20">
+          💬
+        </Feedback>
         <div className="shrink-0">
           <ThemeToggle />
         </div>
@@ -555,9 +558,6 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
               );
             })}
           </div>
-
-          {/* Feedback — renders nothing unless NEXT_PUBLIC_TALLY_FORM_ID is set */}
-          <Feedback />
         </div>
       </div>
 

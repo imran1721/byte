@@ -30,7 +30,13 @@ function loadTally(): Promise<void> {
   });
 }
 
-export default function Feedback({ className }: { className?: string }) {
+export default function Feedback({
+  className,
+  children,
+}: {
+  className?: string;
+  children?: React.ReactNode;
+}) {
   const open = async () => {
     try {
       await loadTally();
@@ -47,13 +53,15 @@ export default function Feedback({ className }: { className?: string }) {
   };
 
   return (
-    <div className={className ?? "mt-7 border-t border-fg/10 pt-4"}>
-      <button
-        onClick={open}
-        className="text-sm font-medium text-fg/60 transition hover:text-fg"
-      >
-        💬 Send feedback
-      </button>
-    </div>
+    <button
+      onClick={open}
+      aria-label="Send feedback"
+      title="Send feedback"
+      className={
+        className ?? "text-sm font-medium text-fg/60 transition hover:text-fg"
+      }
+    >
+      {children ?? "💬 Send feedback"}
+    </button>
   );
 }

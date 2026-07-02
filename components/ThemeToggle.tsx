@@ -42,11 +42,13 @@ export default function ThemeToggle() {
   const vel = useRef({ x: 0, y: 0 });
   const raf = useRef<number | undefined>(undefined);
   const skipChange = useRef(false); // a pull already handled the flip; ignore native change
+  const endDrag = useRef<(() => void) | null>(null); // tears down the active pull
 
   useEffect(() => {
     setLight(document.documentElement.classList.contains("light"));
     return () => {
       if (raf.current) cancelAnimationFrame(raf.current);
+      endDrag.current?.(); // don't leak window listeners if we unmount mid-pull
     };
   }, []);
 
@@ -99,62 +101,70 @@ export default function ThemeToggle() {
     startSpring();
   };
 
-  const onPointerDown = (e: React.PointerEvent) => {
-    // Don't capture or preventDefault yet — keep the native tap path clean.
+  const onPointerDown = () => {
     if (raf.current) cancelAnimationFrame(raf.current);
     const r = box.current!.getBoundingClientRect();
     anchor.current = { x: r.left + r.width / 2, y: r.top };
     down.current = true;
     draggingRef.current = false;
-  };
 
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!down.current) return;
-    let dx = e.clientX - anchor.current.x;
-    let dy = e.clientY - anchor.current.y;
+    // Track the pull on `window`, not the tiny <input>, so the bead keeps
+    // following once the cursor leaves the hit-area (e.g. dragged down over the
+    // feed) and always gets its release — no more freezing mid-pull. We don't
+    // capture or preventDefault until movement escalates a press into a pull,
+    // so a plain tap stays a clean native toggle (keeps the iOS haptic).
+    const move = (ev: PointerEvent) => {
+      if (!down.current) return;
+      let dx = ev.clientX - anchor.current.x;
+      let dy = ev.clientY - anchor.current.y;
 
-    // Escalate a press into a pull the moment the finger leaves the rest point.
-    if (!draggingRef.current) {
-      if (Math.hypot(dx, dy - REST) <= DRAG_THRESHOLD) return;
-      draggingRef.current = true;
-      setDragging(true);
-      try {
-        e.currentTarget.setPointerCapture(e.pointerId);
-      } catch {
-        /* not all pointers capturable */
+      if (!draggingRef.current) {
+        if (Math.hypot(dx, dy - REST) <= DRAG_THRESHOLD) return;
+        draggingRef.current = true;
+        setDragging(true);
       }
-    }
-    e.preventDefault(); // now it's a pull — suppress the native toggle
+      ev.preventDefault(); // it's a pull now — suppress text selection etc.
 
-    const d = Math.hypot(dx, dy);
-    if (d > MAX_DIST) {
-      dx = (dx / d) * MAX_DIST;
-      dy = (dy / d) * MAX_DIST;
-    }
-    let vx = dx - pos.current.x;
-    let vy = dy - pos.current.y;
-    const vmag = Math.hypot(vx, vy);
-    const VMAX = 28; // clamp so a fast fling can't send the spring wild
-    if (vmag > VMAX) {
-      vx = (vx / vmag) * VMAX;
-      vy = (vy / vmag) * VMAX;
-    }
-    vel.current = { x: vx, y: vy };
-    pos.current = { x: dx, y: dy };
-    setOffset({ x: dx, y: dy });
-  };
+      const d = Math.hypot(dx, dy);
+      if (d > MAX_DIST) {
+        dx = (dx / d) * MAX_DIST;
+        dy = (dy / d) * MAX_DIST;
+      }
+      let vx = dx - pos.current.x;
+      let vy = dy - pos.current.y;
+      const vmag = Math.hypot(vx, vy);
+      const VMAX = 28; // clamp so a fast fling can't send the spring wild
+      if (vmag > VMAX) {
+        vx = (vx / vmag) * VMAX;
+        vy = (vy / vmag) * VMAX;
+      }
+      vel.current = { x: vx, y: vy };
+      pos.current = { x: dx, y: dy };
+      setOffset({ x: dx, y: dy });
+    };
 
-  const onPointerUp = () => {
-    if (!down.current) return;
-    down.current = false;
-    if (!draggingRef.current) return; // a tap — let the native onChange handle it
-    draggingRef.current = false;
-    setDragging(false);
-    skipChange.current = true; // a stray native change may follow; ignore it
-    window.setTimeout(() => (skipChange.current = false), 0);
-    applyTheme(!document.documentElement.classList.contains("light"));
-    buzz(14);
-    startSpring();
+    const up = () => {
+      down.current = false;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      window.removeEventListener("blur", up); // released outside the window
+      endDrag.current = null;
+      if (!draggingRef.current) return; // a tap — let the native onChange handle it
+      draggingRef.current = false;
+      setDragging(false);
+      skipChange.current = true; // a stray native change may follow; ignore it
+      window.setTimeout(() => (skipChange.current = false), 0);
+      applyTheme(!document.documentElement.classList.contains("light"));
+      buzz(14);
+      startSpring();
+    };
+
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    window.addEventListener("blur", up);
+    endDrag.current = up;
   };
 
   const dist = Math.hypot(offset.x, offset.y);
@@ -210,9 +220,6 @@ export default function ThemeToggle() {
         checked={light}
         onChange={onChange}
         onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
         ref={(el) => el?.setAttribute("switch", "")}
         aria-label={light ? "Turn off the lights" : "Turn on the lights"}
         title="Tap or pull the chain to switch theme"

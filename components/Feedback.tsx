@@ -1,9 +1,10 @@
 "use client";
 
-// Opens a Tally feedback form in a popup. Configure the form id via
-// NEXT_PUBLIC_TALLY_FORM_ID (from the form's tally.so/r/<id> URL); the button
-// is hidden until it's set. Loads Tally's embed script on first click.
-const FORM_ID = process.env.NEXT_PUBLIC_TALLY_FORM_ID;
+// Opens the byte feedback form (tally.so/r/ODgNRg) in a popup. The form id is
+// public (it ships in embed code), so we default it and allow an override via
+// NEXT_PUBLIC_TALLY_FORM_ID. Tally's embed script loads on first click, not on
+// every page, so it costs nothing until someone actually opens feedback.
+const FORM_ID = process.env.NEXT_PUBLIC_TALLY_FORM_ID || "ODgNRg";
 const SCRIPT = "https://tally.so/widgets/embed.js";
 
 declare global {
@@ -30,12 +31,15 @@ function loadTally(): Promise<void> {
 }
 
 export default function Feedback({ className }: { className?: string }) {
-  if (!FORM_ID) return null;
-
   const open = async () => {
     try {
       await loadTally();
-      window.Tally?.openPopup(FORM_ID, { layout: "modal", width: 500, overlay: true });
+      window.Tally?.openPopup(FORM_ID, {
+        layout: "modal",
+        width: 500,
+        overlay: true,
+        emoji: { text: "👋", animation: "wave" },
+      });
     } catch {
       // script blocked/offline — fall back to the hosted form in a new tab
       window.open(`https://tally.so/r/${FORM_ID}`, "_blank", "noopener");

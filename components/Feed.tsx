@@ -198,14 +198,6 @@ export default function Feed({ items: initialItems }: { items: FeedItem[] }) {
     });
   };
 
-  // Tell the splash the content is on screen so it can dismiss (set a flag too,
-  // in case the splash mounts after this fires).
-  useEffect(() => {
-    const w = window as typeof window & { __byteReady?: boolean };
-    w.__byteReady = true;
-    window.dispatchEvent(new Event("byte:ready"));
-  }, []);
-
   useEffect(() => {
     const saved = localStorage.getItem(INTERESTS_KEY);
     if (saved) {

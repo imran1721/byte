@@ -26,32 +26,16 @@ export default function Splash() {
   const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
+    // Just play the animation, then reveal the feed — don't wait on any
+    // readiness signal. Page 0 is server-rendered, so real content is already
+    // behind the splash; gating on readiness only risked lingering too long.
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const minHold = reduce ? 300 : 1700; // always show the animation at least this long
-    const started = Date.now();
-    let done = false;
-
-    const dismiss = () => {
-      if (done) return;
-      done = true;
-      setLeaving(true);
-      window.setTimeout(() => setShow(false), 450);
-    };
-
-    // Stay until the feed signals it has rendered, but never cut the animation short.
-    const onReady = () =>
-      window.setTimeout(dismiss, Math.max(0, minHold - (Date.now() - started)));
-
-    const w = window as typeof window & { __byteReady?: boolean };
-    if (w.__byteReady) onReady();
-    else window.addEventListener("byte:ready", onReady, { once: true });
-
-    // Safety net: never trap the user behind the splash if something stalls.
-    const failsafe = window.setTimeout(dismiss, 10000);
-
+    const hold = reduce ? 300 : 1800; // ~the animation length
+    const a = window.setTimeout(() => setLeaving(true), hold);
+    const b = window.setTimeout(() => setShow(false), hold + 450);
     return () => {
-      window.removeEventListener("byte:ready", onReady);
-      window.clearTimeout(failsafe);
+      window.clearTimeout(a);
+      window.clearTimeout(b);
     };
   }, []);
 
